@@ -1,0 +1,471 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Démo pré-analyse CCTP</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Mise en page : plan technique quadrillé – document à gauche, checklist à droite, surlignage jaune = choix proposé */
+:root {
+  --paper: #F1F3F0; --sheet: #FFFFFF; --grid: #DDE3E8; --ink: #14233F; --muted: #5A6678; --line: #B9C3CF;
+  --marker: #FFD60A; --marker-ink: #14233F; --alert: #C8233A; --alert-bg: #FDECEE; --ok: #257A47; --ok-bg: #E4F3EA;
+  --todo: #B46F00; --todo-bg: #FFF1D6; --link: #2F5DA8; --chip: #EEF1F4;
+  --f-disp: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --f-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #0F1A2E; --sheet: #16233B; --grid: #1D2C47; --ink: #E8EDF4; --muted: #9AA8BC; --line: #34465F;
+  --marker: #FFD60A; --marker-ink: #14233F; --alert: #FF6B7E; --alert-bg: #3A1B26; --ok: #5BCB8A; --ok-bg: #173226;
+  --todo: #FFC15A; --todo-bg: #3A2C12; --link: #8DB4F2; --chip: #1E2E4A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #0F1A2E; --sheet: #16233B; --grid: #1D2C47; --ink: #E8EDF4; --muted: #9AA8BC; --line: #34465F;
+  --marker: #FFD60A; --marker-ink: #14233F; --alert: #FF6B7E; --alert-bg: #3A1B26; --ok: #5BCB8A; --ok-bg: #173226;
+  --todo: #FFC15A; --todo-bg: #3A2C12; --link: #8DB4F2; --chip: #1E2E4A; color-scheme: dark }
+
+body {
+  background: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px; color: var(--ink); font-family: var(--f-sans); font-size: 15px; line-height: 1.5;
+}
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 28px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 20px; }
+header.top { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: end; justify-content: space-between; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.eyebrow::before { content: ""; width: 10px; height: 10px; background: var(--ink); }
+h1 { font-family: var(--f-disp); font-weight: 800; font-size: clamp(34px, 5vw, 56px); line-height: 1; margin: 6px 0 8px; text-transform: uppercase; text-wrap: balance; }
+h1 .hl { background: var(--marker); color: var(--marker-ink); padding: 0 .12em; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: inherit; cursor: pointer; border-radius: 6px; }
+button:focus-visible, textarea:focus-visible, .src:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+.btn-main { background: var(--ink); color: var(--paper); border: 2px solid var(--ink); padding: 12px 20px; font-weight: 600; }
+.btn-main:disabled { opacity: .55; cursor: progress; }
+.btn-alt { background: var(--sheet); color: var(--ink); border: 2px solid var(--ink); padding: 10px 16px; font-weight: 500; }
+.btn-small { background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 5px 10px; font-size: 13px; }
+.status { font-family: var(--f-mono); font-size: 13px; padding: 8px 12px; border: 1px dashed var(--line); background: var(--sheet); min-height: 20px; }
+.status b { font-weight: 500; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--sheet); border: 2px solid var(--ink); min-width: 0; }
+.card > .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.card h2 { font-family: var(--f-disp); font-weight: 800; font-size: 26px; margin: 0; text-transform: uppercase; letter-spacing: .01em; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Document */
+.doc { padding: 6px 18px 18px; max-height: 70vh; overflow: auto; }
+.doc .piece { font-family: var(--f-disp); font-weight: 600; font-size: 20px; margin: 18px 0 4px; padding-top: 10px; border-top: 2px solid var(--ink); }
+.doc .piece:first-child { border-top: 0; margin-top: 6px; }
+.doc .page { display: inline-block; font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; color: var(--muted); border: 1px solid var(--line); padding: 1px 6px; margin: 10px 0 2px; }
+.doc p { margin: 2px 0 6px; max-width: 70ch; }
+.doc mark { background: var(--marker); color: var(--marker-ink); padding: 0 2px; scroll-margin: 120px; }
+.doc textarea { width: 100%; min-height: 60vh; box-sizing: border-box; font-family: var(--f-mono); font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--paper); border: 1px solid var(--line); padding: 12px; resize: vertical; }
+.hint { font-size: 13px; color: var(--muted); padding: 10px 18px 14px; border-top: 1px solid var(--line); }
+
+/* Checklist */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl-wrap { overflow-x: auto; }
+.tbl th { text-align: left; font-family: var(--f-mono); font-weight: 500; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl tr.fresh td { animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: color-mix(in srgb, var(--marker) 35%, transparent); } to { background: transparent; } }
+.lab { font-weight: 600; min-width: 170px; }
+.lab small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 200px; }
+.chip { font-size: 13px; padding: 3px 10px; border: 1px solid var(--line); background: var(--chip); color: var(--muted); border-radius: 3px; white-space: nowrap; }
+.chip.on { background: var(--marker); color: var(--marker-ink); border-color: var(--marker); font-weight: 600; transform: rotate(-.6deg); }
+.chip.free { white-space: normal; }
+.def { font-family: var(--f-mono); font-size: 12px; font-weight: 500; }
+.def.oui { color: var(--ok); } .def.non { color: var(--alert); }
+.src { background: none; border: 0; padding: 0; color: var(--link); font-family: var(--f-mono); font-size: 12.5px; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.src .v { color: var(--ok); text-decoration: none; margin-left: 4px; }
+.src.warn { color: var(--todo); }
+.empty { color: var(--muted); font-size: 13px; }
+.val { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
+.pill.todo { background: var(--todo-bg); color: var(--todo); }
+.pill.oui { background: var(--ok-bg); color: var(--ok); }
+.pill.non { background: var(--alert-bg); color: var(--alert); }
+.vbtn { border: 1px solid var(--line); background: var(--sheet); color: var(--ink); padding: 2px 8px; font-size: 12px; }
+.comment { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+/* Vigilance */
+.vig { padding: 14px 16px 18px; display: grid; gap: 10px; }
+.vig h3 { margin: 0; font-family: var(--f-mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--alert); font-weight: 500; }
+.alert { border: 1px solid var(--line); border-left: 6px solid var(--alert); background: var(--alert-bg); padding: 10px 14px; }
+.alert b { display: block; font-family: var(--f-disp); font-size: 20px; font-weight: 800; }
+.alert p { margin: 2px 0 0; font-size: 14px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 10px 24px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; gap: 8px; align-items: center; }
+.sw { width: 26px; height: 14px; display: inline-block; background: var(--marker); }
+footer { font-size: 13px; color: var(--muted); }
+@media (max-width: 640px) {
+  .tbl thead { display: none; }
+  .tbl, .tbl tbody { display: block; }
+  .tbl tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .tbl td { display: block; padding: 0; border: 0; }
+  .tbl td:nth-child(1), .tbl td:nth-child(2), .tbl td:nth-child(5) { grid-column: 1 / -1; }
+  .tbl td:nth-child(3)::before, .tbl td:nth-child(4)::before, .tbl td:nth-child(5)::before { display: block; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+  .tbl td:nth-child(3)::before { content: "Défini"; }
+  .tbl td:nth-child(4)::before { content: "Source"; }
+  .tbl td:nth-child(5)::before { content: "Validation"; }
+  .lab, .chips { min-width: 0; }
+  .doc { max-height: 55vh; }
+}
+@media (prefers-reduced-motion: reduce) { .tbl tr.fresh td { animation: none; } .chip.on { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Démo · chaîne de devis assistée par IA</div>
+      <h1>Le CCTP se lit, <span class="hl">la checklist se remplit</span></h1>
+      <p class="lede">L'IA lit l'extrait de dossier à gauche et propose les réponses de 8 lignes de la checklist, avec la page où vérifier. Elle signale les contradictions entre pièces. Le chargé d'études valide.</p>
+    </div>
+    <div class="actions">
+      <button class="btn-main" id="run">Lancer l'analyse IA</button>
+      <button class="btn-alt" id="replay">Rejouer le résultat enregistré</button>
+    </div>
+  </header>
+  <div class="status" id="status" role="status" aria-live="polite">Prêt. Cliquez sur « Lancer l'analyse IA ».</div>
+
+  <div class="grid">
+    <section class="card" aria-label="Document analysé">
+      <div class="head">
+        <h2>Dossier (DCE)</h2>
+        <div class="tools">
+          <button class="btn-small" id="edit">Modifier le texte</button>
+          <button class="btn-small" id="pdfbtn">Importer un PDF</button>
+          <button class="btn-small" id="resetdoc">Extrait d'origine</button>
+          <input type="file" id="pdf" accept="application/pdf" hidden>
+        </div>
+      </div>
+      <div class="doc" id="doc"></div>
+      <div class="hint" id="dochint">Extrait réel d'un DCE de logements (anonymisé) : CCTP Électricité, CCTP Menuiseries extérieures, notice descriptive.</div>
+    </section>
+
+    <section class="card" aria-label="Checklist">
+      <div class="head">
+        <h2>Checklist (extrait)</h2>
+        <span class="eyebrow" id="count">0 / 8 lignes · 0 validée</span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Prestation</th><th>Choix proposé</th><th>Défini</th><th>Source</th><th>Validation</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="vig" id="vigbox" hidden>
+        <h3>Points de vigilance détectés</h3>
+        <div id="vig"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="legend">
+    <span><i class="sw"></i>Choix proposé par l'IA (comme la cellule jaune de la checklist)</span>
+    <span><span class="src" style="text-decoration:none">p.32 ✓</span> Source retrouvée mot pour mot dans le document : cliquer pour la voir</span>
+    <span><span class="pill todo">A faire</span> Rien n'est validé sans le chargé d'études</span>
+  </div>
+  <footer>Astuce pour la démo : cliquez sur « Modifier le texte », remplacez « TT » par « IT » en page 64, puis relancez. La réponse change : l'IA lit vraiment le document.</footer>
+</div>
+
+<script>
+const ROWS = [
+  { id: 'origine', label: 'Origine des installations', opts: ['Poste intégré', 'Poste non intégré', 'Groupe électrogène', 'Coffret de coupure'] },
+  { id: 'neutre', label: 'Régime de neutre', opts: ['TT', 'TN', 'IT'] },
+  { id: 'comptage', label: 'Type de comptage', opts: ['Bleu', 'Jaune', 'Vert'] },
+  { id: 'appareillage', label: 'Appareillage', hint: 'marque / gamme', opts: null },
+  { id: 'communication', label: 'Coffret de communication', opts: ['Grade 2', 'Grade 3'] },
+  { id: 'vr', label: 'Commande des volets roulants', hint: 'à la charge du lot', opts: ['ELEC', 'MENUISIER', 'Autre'] },
+  { id: 'secu', label: 'Éclairage de sécurité', opts: ['BAES', 'BAEH', 'Source centrale'] },
+  { id: 'irve', label: 'Fourniture des bornes IRVE', opts: ['OUI', 'NON'] },
+];
+const ROW_IDS = new Set(ROWS.map(r => r.id));
+
+const DOC_ORIGINAL = `### CCTP Lot Électricité (CFO/CFA) – indice 0
+[p.1]
+1.2 Classement des bâtiments. Bât. A : logement collectif, RDC à R+5, 3e famille A. Bât. B : logement collectif, RDC à R+11, 4e famille. Bât. C : hôtel (ERP type O) et bureaux (ERP type W).
+[p.4]
+3.1.2 Origine des installations. Les installations ont pour origine le poste de distribution public situé au-dessus de la cote des Plus Hautes Eaux Connues (PHEC). Le présent lot prendra en charge toutes les installations électriques depuis le TIPI du poste public. Il est prévu des gaines techniques ENEDIS 200 A et 400 A.
+[p.5]
+3.1.3 La GTL sera prévue par le présent lot, elle sera de fabrication ATOLE ou similaire, modèle deux travées toute hauteur (BTT5). La GTL sera prévue en encastrée, à l'entrée de chaque logement. La porte est prévue par le lot menuiserie.
+[p.8]
+Le coffret de communication sera de type C-START 625 THD de chez CASANOVA ou équivalent, permettant la diffusion de la télévision via les prises RJ45.
+[p.9]
+Le câblage vers les points terminaux depuis la GTL est réalisé en étoile et répondra au grade 3 TV du guide UTE C90-483. L'appareillage sera de type DOOXIE blanc de chez LEGRAND ou ODACE blanc de chez SCHNEIDER. Les volets roulants seront motorisés. Il sera prévu dans toutes les pièces au droit des volets motorisés une alimentation électrique, ainsi que les commandes montée/descente.
+[p.11]
+3.1.7.1 Comptage des services généraux. Pour chaque cage, il est prévu un comptage de type bleu dédié Services Généraux.
+[p.13]
+Il sera prévu la pose de Blocs Autonomes d'Éclairage d'Habitations (8/45 lumens) de sécurité agréés dans les escaliers, les SAS et les circulations. Pose de blocs autonomes d'éclairage de sécurité agréés dans chaque local technique (45 lumens - 1 heure).
+[p.32]
+Cette sélectivité, qui dans tous les cas sera du type vertical et totale, sera adaptée suivant le régime de distribution du neutre (TT).
+[p.64]
+4.3.2 Origine des installations (hôtel, Bât. C). Le bâtiment sera alimenté depuis le réseau basse tension ENEDIS. Un poste de transformation publique sera mis en place, intégré au bâtiment. Le régime de neutre sera du type TT. Le branchement à prévoir sera un Tarif Jaune pour la zone hôtel.
+[p.95]
+5.1.2 Infrastructure de recharge de véhicules électriques. L'ensemble des places seront pré-équipées de 2 fourreaux et de chemins de câbles. À la charge du présent lot, il sera prévu les mesures conservatoires suivantes : le coffret de coupure générale « Pompier », des chemins de câbles spécifiques IRVE, les fourreaux jusqu'en fond de chaque place de stationnement.
+[p.99]
+Récapitulatif des postes publics : Bât. C ERP type O, 216 kVA, tarif : bleus.
+### CCTP Lot 11 Menuiseries extérieures – indice 0
+[p.25]
+4.3.4 Manœuvre motorisée. Pour tous les volets roulants, il sera prévu une alimentation électrique. Cette prestation comprendra pour chaque volet concerné un moteur tubulaire intégré dans l'axe d'enroulement. Une commande motorisée d'ouverture/fermeture s'effectuera par un boîtier de commande individuelle. Alimentation et raccordement à la charge du lot ÉLECTRICITÉ.
+### Notice descriptive Bureaux (Bât. C)
+[§ Courants forts]
+Il sera prévu dans le bâtiment, depuis le réseau concessionnaire, un seul point de livraison, uniquement dédié au programme « bureaux ». Le régime de neutre sera de type TN.`;
+
+// Résultat enregistré (même méthode, déjà calculé) : utilisé si l'IA en direct n'est pas disponible
+const OFFLINE = {
+  rows: [
+    { id: 'origine', choix: ['Poste intégré'], defini: true, source: 'CCTP Électricité p.64', citation: 'Un poste de transformation publique sera mis en place, intégré au bâtiment.', commentaire: 'Lot ELEC depuis le TIPI du poste public (p.4).' },
+    { id: 'neutre', choix: ['TT'], defini: true, source: 'CCTP Électricité p.64', citation: 'Le régime de neutre sera du type TT.', commentaire: 'Confirmé p.32 ; la notice Bureaux dit TN.' },
+    { id: 'comptage', choix: ['Bleu', 'Jaune'], defini: true, source: 'CCTP Électricité p.11', citation: 'il est prévu un comptage de type bleu dédié Services Généraux', commentaire: 'Tarif jaune pour l\'hôtel (p.64).' },
+    { id: 'appareillage', choix: ['DOOXIE blanc (Legrand) ou ODACE blanc (Schneider)'], defini: true, source: 'CCTP Électricité p.9', citation: 'L\'appareillage sera de type DOOXIE blanc de chez LEGRAND ou ODACE blanc de chez SCHNEIDER.', commentaire: '' },
+    { id: 'communication', choix: ['Grade 3'], defini: true, source: 'CCTP Électricité p.9', citation: 'répondra au grade 3 TV du guide UTE C90-483', commentaire: 'Coffret CASANOVA C-START 625 THD (p.8).' },
+    { id: 'vr', choix: ['ELEC', 'MENUISIER'], defini: true, source: 'CCTP Électricité p.9', citation: 'une alimentation électrique, ainsi que les commandes montée/descente', commentaire: 'Le lot 11 prévoit aussi le boîtier de commande.' },
+    { id: 'secu', choix: ['BAEH', 'BAES'], defini: true, source: 'CCTP Électricité p.13', citation: 'Blocs Autonomes d\'Éclairage d\'Habitations (8/45 lumens)', commentaire: 'BAES dans les locaux techniques.' },
+    { id: 'irve', choix: ['NON'], defini: true, source: 'CCTP Électricité p.95', citation: 'il sera prévu les mesures conservatoires suivantes', commentaire: 'Pré-équipement seulement (fourreaux, chemins de câbles).' },
+  ],
+  vig: [
+    { titre: 'Régime de neutre contradictoire', detail: 'CCTP Électricité p.32 et p.64 : TT. Notice Bureaux : TN. Question au maître d\'œuvre avant de chiffrer les protections.' },
+    { titre: 'Commande des volets en double', detail: 'CCTP Électricité p.9 : commandes au lot ELEC. CCTP Lot 11 p.25 : boîtier de commande au lot menuiserie. Risque de double chiffrage.' },
+    { titre: 'Tarif de l\'hôtel incohérent', detail: 'CCTP Électricité p.64 : tarif jaune. Récapitulatif p.99 : tarif bleu. À faire préciser.' },
+  ],
+};
+
+let docText = DOC_ORIGINAL;
+let editing = false;
+let state = { rows: {}, vig: [], valid: {} };
+let hl = null;              // citation surlignée dans le document
+let timer = null, t0 = 0, ctl = null, running = false;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = s => String(s || '').replace(/[’‘`]/g, "'").replace(/[«»“”]/g, '"').replace(/\s+/g, ' ').trim().toLowerCase();
+
+function setStatus(html) { $('status').innerHTML = html; }
+
+// ---------- document ----------
+function markIn(text, quote) {
+  if (!quote) return esc(text);
+  const nt = norm(text).length === text.replace(/\s+/g, ' ').trim().length ? text : text;
+  const lowT = nt.replace(/[’‘`]/g, "'").replace(/[«»“”]/g, '"').toLowerCase();
+  let q = quote.replace(/[’‘`]/g, "'").replace(/[«»“”]/g, '"').replace(/\s+/g, ' ').trim().toLowerCase();
+  let i = lowT.indexOf(q), len = q.length;
+  if (i < 0 && q.length > 40) { q = q.slice(0, 40); i = lowT.indexOf(q); len = q.length; }
+  if (i < 0) return esc(nt);
+  return esc(nt.slice(0, i)) + '<mark id="hlmark">' + esc(nt.slice(i, i + len)) + '</mark>' + esc(nt.slice(i + len));
+}
+function renderDoc() {
+  const box = $('doc');
+  if (editing) {
+    box.innerHTML = '<textarea id="ta" aria-label="Texte du dossier" spellcheck="false"></textarea>';
+    $('ta').value = docText;
+    return;
+  }
+  const out = [];
+  for (const raw of docText.split('\n')) {
+    const line = raw.replace(/\s+/g, ' ').trim();
+    if (!line) continue;
+    if (line.startsWith('### ')) out.push('<div class="piece">' + esc(line.slice(4)) + '</div>');
+    else if (/^\[(p\.\s*\d+|§[^\]]*)\]$/.test(line)) out.push('<span class="page">' + esc(line.slice(1, -1)) + '</span>');
+    else out.push('<p>' + markIn(line, hl) + '</p>');
+  }
+  box.innerHTML = out.join('');
+  const m = document.getElementById('hlmark');
+  if (m) m.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
+// ---------- checklist ----------
+function citationFound(c) { return !!c && norm(docText).includes(norm(c).slice(0, Math.min(60, norm(c).length))); }
+function renderRows() {
+  const tb = $('rows');
+  tb.innerHTML = ROWS.map(r => {
+    const res = state.rows[r.id];
+    const choix = res ? (res.choix || []).map(String) : [];
+    let chips;
+    if (r.opts) chips = r.opts.map(o => `<span class="chip${choix.some(c => norm(c) === norm(o)) ? ' on' : ''}">${esc(o)}</span>`).join('');
+    else chips = res && choix.length ? `<span class="chip on free">${esc(choix.join(' / '))}</span>` : '<span class="chip">…</span>';
+    const def = res ? `<span class="def ${res.defini ? 'oui' : 'non'}">${res.defini ? 'OUI' : 'NON'}</span>` : '<span class="empty">—</span>';
+    let src = '<span class="empty">—</span>';
+    if (res && res.defini && res.source) {
+      const ok = citationFound(res.citation);
+      src = `<button class="src${ok ? '' : ' warn'}" data-q="${esc(res.citation || '')}" title="${ok ? 'Voir la phrase dans le document' : 'Phrase non retrouvée telle quelle : à vérifier'}">${esc(res.source)}${ok ? '<span class="v">✓</span>' : ' ⚠'}</button>`;
+    } else if (res) src = '<span class="empty">non trouvé</span>';
+    const v = state.valid[r.id];
+    let val = '<span class="empty">—</span>';
+    if (res) val = `<span class="pill ${v || 'todo'}">${v === 'oui' ? 'Oui' : v === 'non' ? 'Non' : 'A faire'}</span>` +
+      (v ? '' : `<button class="vbtn" data-ok="${r.id}">Valider</button><button class="vbtn" data-ko="${r.id}">Corriger</button>`);
+    const com = res && res.commentaire ? `<div class="comment">${esc(res.commentaire)}</div>` : '';
+    return `<tr id="row-${r.id}"><td class="lab">${esc(r.label)}${r.hint ? `<small>${esc(r.hint)}</small>` : ''}</td><td><div class="chips">${chips}</div>${com}</td><td>${def}</td><td>${src}</td><td><div class="val">${val}</div></td></tr>`;
+  }).join('');
+  const filled = Object.keys(state.rows).length, val = Object.keys(state.valid).length;
+  $('count').textContent = `${filled} / ${ROWS.length} lignes · ${val} validée${val > 1 ? 's' : ''}`;
+  const vb = $('vigbox');
+  vb.hidden = state.vig.length === 0;
+  $('vig').innerHTML = state.vig.map(x => `<div class="alert"><b>${esc(x.titre || 'Point de vigilance')}</b><p>${esc(x.detail || '')}</p></div>`).join('');
+}
+function flash(id) { const tr = $('row-' + id); if (tr) { tr.classList.remove('fresh'); void tr.offsetWidth; tr.classList.add('fresh'); } }
+function setRow(o) {
+  state.rows[o.id] = { choix: Array.isArray(o.choix) ? o.choix : (o.choix ? [o.choix] : []), defini: !!o.defini, source: o.source || '', citation: o.citation || '', commentaire: o.commentaire || '' };
+  renderRows(); flash(o.id);
+}
+function addVig(o) { if (o && (o.titre || o.detail)) { state.vig.push({ titre: o.titre, detail: o.detail }); renderRows(); } }
+
+$('rows').addEventListener('click', e => {
+  const s = e.target.closest('.src');
+  if (s) { hl = s.dataset.q; if (editing) toggleEdit(); renderDoc(); return; }
+  const ok = e.target.closest('[data-ok]'), ko = e.target.closest('[data-ko]');
+  if (ok) { state.valid[ok.dataset.ok] = 'oui'; renderRows(); }
+  if (ko) { state.valid[ko.dataset.ko] = 'non'; renderRows(); }
+});
+
+// ---------- chronomètre ----------
+function startTimer(label) {
+  t0 = performance.now(); clearInterval(timer);
+  timer = setInterval(() => setStatus(`<b>${label}</b> · ${Math.round((performance.now() - t0) / 1000)} s`), 250);
+}
+function stopTimer() { clearInterval(timer); return Math.round((performance.now() - t0) / 1000); }
+function resetResults() { state = { rows: {}, vig: [], valid: {} }; hl = null; renderRows(); renderDoc(); }
+function busy(b) { running = b; $('run').disabled = b; $('replay').disabled = b; $('run').textContent = b ? 'Analyse en cours…' : 'Lancer l\'analyse IA'; }
+
+// ---------- analyse IA en direct ----------
+function buildPrompt() {
+  const lines = ROWS.map(r => `- id=${r.id} | ${r.label}${r.hint ? ' (' + r.hint + ')' : ''} | ${r.opts ? 'options : ' + r.opts.join(' ; ') : 'texte libre'}`).join('\n');
+  return `Tu assistes un chargé d'études en électricité (lot CFO/CFA) qui prépare un devis.
+Lis le DOSSIER ci-dessous : les pièces commencent par "###", les pages sont marquées [p.N] ou [§ ...].
+Pour chaque ligne de checklist, trouve la réponse UNIQUEMENT dans le dossier.
+
+Réponds avec UNIQUEMENT des lignes JSON, une par ligne, sans autre texte et sans bloc de code.
+1) D'abord exactement ${ROWS.length} lignes, dans l'ordre des lignes de checklist :
+{"id":"<id>","choix":["<option>"],"defini":true,"source":"<nom court de la pièce> p.<N>","citation":"<phrase recopiée MOT POUR MOT du dossier, 25 mots maximum>","commentaire":"<12 mots maximum>"}
+2) Puis 0 à 4 lignes de points de vigilance (contradiction entre deux pièces ou entre deux pages, ou information importante manquante) :
+{"id":"vigilance","titre":"<6 mots maximum>","detail":"<35 mots maximum, cite les pièces et les pages>"}
+
+Règles :
+- "choix" reprend exactement une ou plusieurs des options proposées. Pour une ligne "texte libre", mets la valeur trouvée.
+- Si deux pièces se contredisent, mets les deux options concernées dans "choix" et crée un point de vigilance.
+- Si l'information n'est pas dans le dossier : "defini":false, "choix":[], "source":"", "citation":"".
+- La citation doit être un extrait exact du dossier. N'invente rien.
+
+LIGNES DE CHECKLIST :
+${lines}
+
+DOSSIER :
+${docText}`;
+}
+function handleLine(l) {
+  l = l.trim().replace(/^```(json)?/i, '').replace(/```$/, '').replace(/,$/, '').trim();
+  if (!l.startsWith('{')) return;
+  try {
+    const o = JSON.parse(l);
+    if (o.id === 'vigilance') addVig(o);
+    else if (ROW_IDS.has(o.id)) setRow(o);
+  } catch (e) { /* ligne incomplète ou non JSON : ignorée */ }
+}
+const ERR = {
+  not_granted: 'L\'accès à Claude n\'a pas été autorisé pour cette page.',
+  sampling_disabled: 'Claude n\'est pas disponible pour ce compte.',
+  rate_limited: 'Trop de demandes pour le moment. Réessayez dans quelques minutes.',
+  session_expired: 'Session expirée : reconnectez-vous à Claude.',
+  prompt_too_large: 'Document trop long : gardez les chapitres utiles (moins de 200 000 caractères).',
+  refused: 'Claude a refusé cette demande.',
+};
+function getSample() {
+  try { return (window.claude && typeof window.claude.use === 'function') ? window.claude.use('sample').catch(() => null) : Promise.resolve(null); }
+  catch (e) { return Promise.resolve(null); }
+}
+async function runLive() {
+  if (running) return;
+  if (editing) toggleEdit();
+  const sample = await getSample();
+  if (!sample) { setStatus('L\'IA en direct n\'est pas disponible dans cette vue : lecture du résultat enregistré.'); return replay(); }
+  resetResults(); busy(true);
+  startTimer('L\'IA lit le dossier');
+  ctl = new AbortController();
+  let pending = '';
+  try {
+    await sample(buildPrompt(), {
+      modelTier: 'default', effort: 'low', signal: ctl.signal,
+      onText: ({ delta }) => { const parts = (pending + delta).split('\n'); pending = parts.pop(); parts.forEach(handleLine); },
+    });
+    if (pending.trim()) handleLine(pending);
+    const s = stopTimer();
+    const n = Object.keys(state.rows).length;
+    setStatus(`<b>Analyse IA en direct terminée en ${s} s</b> · ${n} lignes proposées · ${state.vig.length} point(s) de vigilance. Cliquez sur une source pour la vérifier, puis validez.`);
+  } catch (e) {
+    stopTimer();
+    if (e && e.text) { e.text.split('\n').forEach(handleLine); }
+    if (e && e.code === 'cancelled') setStatus('Analyse arrêtée.');
+    else setStatus((ERR[e && e.code] || 'L\'analyse a été interrompue. Réessayez.') + ' Vous pouvez aussi cliquer sur « Rejouer le résultat enregistré ».');
+  } finally { busy(false); }
+}
+
+// ---------- résultat enregistré ----------
+async function replay() {
+  if (running) return;
+  if (editing) toggleEdit();
+  docText = DOC_ORIGINAL; resetResults(); busy(true);
+  startTimer('Lecture du résultat enregistré');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  for (const o of OFFLINE.rows) { await wait(550); setRow(o); }
+  for (const v of OFFLINE.vig) { await wait(650); addVig(v); }
+  stopTimer();
+  setStatus('<b>Résultat enregistré</b> (même méthode, calculé à l\'avance) · Pour voir l\'IA travailler en direct, cliquez sur « Lancer l\'analyse IA ».');
+  busy(false);
+}
+
+// ---------- édition / import ----------
+function toggleEdit() {
+  if (editing) { const ta = $('ta'); if (ta) docText = ta.value; editing = false; $('edit').textContent = 'Modifier le texte'; }
+  else { editing = true; $('edit').textContent = 'Terminer la modification'; }
+  renderDoc();
+}
+$('edit').onclick = toggleEdit;
+$('resetdoc').onclick = () => { if (running) return; editing = false; $('edit').textContent = 'Modifier le texte'; docText = DOC_ORIGINAL; $('dochint').textContent = 'Extrait réel d\'un DCE de logements (anonymisé) : CCTP Électricité, CCTP Menuiseries extérieures, notice descriptive.'; resetResults(); setStatus('Extrait d\'origine rétabli.'); };
+$('pdfbtn').onclick = () => $('pdf').click();
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; res(window.pdfjsLib); };
+    s.onerror = () => rej(new Error('pdf.js'));
+    document.head.appendChild(s);
+  });
+}
+$('pdf').onchange = async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!f || running) return;
+  setStatus('Lecture du PDF…');
+  try {
+    const lib = await loadPdfJs();
+    const pdf = await lib.getDocument({ data: await f.arrayBuffer() }).promise;
+    const max = Math.min(pdf.numPages, 120);
+    let txt = `### ${f.name.replace(/\.pdf$/i, '')}`, size = 0;
+    for (let i = 1; i <= max && size < 180000; i++) {
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      const t = tc.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+      if (t) { txt += `\n[p.${i}]\n${t}`; size += t.length; }
+      if (i % 10 === 0) setStatus(`Lecture du PDF… page ${i} / ${max}`);
+    }
+    if (size < 200) { setStatus('Ce PDF ne contient pas de texte lisible (plan ou scan) : l\'OCR sera nécessaire dans la version complète.'); return; }
+    editing = false; $('edit').textContent = 'Modifier le texte';
+    docText = txt; resetResults();
+    $('dochint').textContent = `PDF importé : ${f.name} · ${max} page(s) lue(s)${size >= 180000 ? ' (tronqué pour la démo)' : ''}. Les numéros de page sont ceux du PDF.`;
+    setStatus('PDF chargé. Cliquez sur « Lancer l\'analyse IA ».');
+  } catch (err) {
+    setStatus('Impossible de lire ce PDF ici. Copiez-collez plutôt le texte avec « Modifier le texte ».');
+  }
+};
+
+$('run').onclick = runLive;
+$('replay').onclick = replay;
+renderDoc(); renderRows();
+getSample().then(s => { if (!s) { $('run').title = 'IA en direct indisponible dans cette vue'; } });
+</script>
+
+</body></html>
